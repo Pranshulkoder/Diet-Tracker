@@ -1,1 +1,8 @@
-AQ.Ab8RN6JOvj8bU65-gqu8FIIY-DFRYRpPRtkSdafI8CrmCDNj5Q
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example

@@ -60,3 +60,4 @@ npm start
 - The server reads `PORT` from the environment and falls back to `3000` locally.
 - Set `GEMINI_API_KEY` in your deployment platform’s secret or environment settings.
 - `APP_URL` is listed in [.env.example](./.env.example) for future use, but it is not currently required by the app.
+working link of project : 'https://diettracker-tau.vercel.app/'

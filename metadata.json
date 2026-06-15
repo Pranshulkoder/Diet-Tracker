@@ -1,0 +1,10 @@
+{
+  "name": "Habit Diet Tracker",
+  "description": "Seamless habit, diet, macro, and caloric intake tracker with barcode and visual foods scanner, personalized body composition goals, and smart wearable integration sync.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

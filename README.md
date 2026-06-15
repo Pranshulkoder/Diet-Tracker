@@ -1,20 +1,62 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Diet Tracker
 
-# Run and deploy your AI Studio app
+Habit and diet tracker built with React, Vite, Express, and TypeScript.
 
-This contains everything you need to run your app locally.
+## Requirements
 
-View your app in AI Studio: https://ai.studio/apps/84d86bd2-d118-4118-8ca3-9c259086dd87
+- Node.js 18 or later
+- npm
+- A Gemini API key if you want the AI features to use live Gemini responses
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+## Local Setup
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+
+   ```bash
+   npm install
+   ```
+
+2. Create a local environment file:
+
+   - Copy [.env.example](./.env.example) to [.env.local](./.env.local)
+   - Set `GEMINI_API_KEY` to your Gemini API key
+
+3. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Open the app in your browser at `http://localhost:3000`
+
+If you do not provide `GEMINI_API_KEY`, the app still runs and uses local fallback behavior for AI-powered features.
+
+## Production Build
+
+To create a production build:
+
+```bash
+npm run build
+```
+
+This creates a bundled frontend in `dist/` and a Node server bundle at `dist/server.cjs`.
+
+To run the production build locally:
+
+```bash
+npm start
+```
+
+## Scripts
+
+- `npm run dev` - Start the app in development mode
+- `npm run build` - Build the frontend and server for production
+- `npm start` - Run the production server from `dist/server.cjs`
+- `npm run lint` - Type-check the project with `tsc --noEmit`
+- `npm run clean` - Remove generated build output
+
+## Deployment Notes
+
+- The server reads `PORT` from the environment and falls back to `3000` locally.
+- Set `GEMINI_API_KEY` in your deployment platform’s secret or environment settings.
+- `APP_URL` is listed in [.env.example](./.env.example) for future use, but it is not currently required by the app.

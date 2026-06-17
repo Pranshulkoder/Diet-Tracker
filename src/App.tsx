@@ -200,14 +200,14 @@ export default function App() {
     <div className="min-h-screen bg-vibrant-bg text-white font-sans selection:bg-vibrant-lime/30">
       
       {/* Prime Header Block */}
-      <header className="bg-[#0A0A0B]/80 backdrop-blur-md border-b border-vibrant-border sticky top-0 z-50 shadow-[0_1px_15px_rgba(0,0,0,0.6)]">
+      <header className="bg-vibrant-bg/80 backdrop-blur-md border-b border-vibrant-border sticky top-0 z-50 shadow-[0_1px_15px_rgba(0,0,0,0.6)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2.5 bg-vibrant-lime rounded-2xl text-black transform hover:rotate-6 transition-transform">
               <Dumbbell className="w-5 h-5 font-bold" />
             </div>
             <div>
-              <h1 className="text-xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-vibrant-lime to-vibrant-cyan leading-none">
+              <h1 className="text-xl font-black italic tracking-tighter text-transparent bg-clip-text bg-linear-to-r from-vibrant-lime to-vibrant-cyan leading-none">
                 CORE_SYNC
               </h1>
               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-1">High-Efficiency Metabolic Coach</p>
@@ -238,7 +238,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
         {/* Navigation Tab rail */}
-        <div className="flex justify-start border-l-4 border-vibrant-lime bg-vibrant-card p-3 rounded-2xl border border-vibrant-border overflow-x-auto gap-2">
+        <div className="flex justify-start border border-vibrant-border border-l-4 border-l-vibrant-lime bg-vibrant-card p-3 rounded-2xl overflow-x-auto gap-2">
           <button
             id="tab-tracker-btn"
             onClick={() => setActiveTab("tracker")}

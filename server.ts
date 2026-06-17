@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { GoogleGenAI, Type } from "@google/genai";
+import Groq from "groq-sdk";
 import { createServer as createViteServer } from "vite";
 
 // Load environment variables
@@ -13,96 +13,103 @@ const PORT = 3000;
 // Maximum payload size for base64 visual uploads
 app.use(express.json({ limit: "15mb" }));
 
-// Initialize Gemini Client safely
-let ai: GoogleGenAI | null = null;
-const API_KEY = process.env.GEMINI_API_KEY;
+// Initialize Groq Client safely
+let ai: Groq | null = null;
+const API_KEY = process.env.GROQ_API_KEY;
 
-if (API_KEY && API_KEY !== "MY_GEMINI_API_KEY") {
+if (API_KEY && API_KEY !== "MY_GROQ_API_KEY") {
   try {
-    ai = new GoogleGenAI({
+    ai = new Groq({
       apiKey: API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
     });
-    console.log("Gemini API client initialized successfully.");
+    console.log("Groq API client initialized successfully.");
   } catch (err) {
-    console.error("Failed to initialize Gemini Client:", err);
+    console.error("Failed to initialize Groq Client:", err);
   }
 } else {
-  console.log("No valid GEMINI_API_KEY found. Operating in local fallback simulation mode.");
+  console.log("No valid GROQ_API_KEY found. Operating in local fallback simulation mode.");
 }
 
-// Helper to perform robust fallback model text generation if the primary model is denied or restricted
+// Helper to perform robust text generation using Groq API
 async function generateContentWithFallback(options: {
   model?: string;
   contents: any;
   config?: any;
 }) {
   if (!ai) {
-    throw new Error("Gemini AI client not initialized");
+    throw new Error("Groq AI client not initialized");
   }
-  const primaryModel = options.model || "gemini-3.5-flash";
-  const fallbackModels = ["gemini-2.1-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+  
+  const primaryModel = options.model || "llama-3.3-70b-versatile";
+  const fallbackModels = ["openai/gpt-oss-120b", "llama-3.1-8b-instant"];
+  
+  const systemInstruction = options.config?.systemInstruction || "You are a helpful assistant.";
+  const userMessage = typeof options.contents === "string" ? options.contents : options.contents.parts?.[0]?.text || JSON.stringify(options.contents);
+  const responseFormat = options.config?.responseFormat;
+  const temperature = typeof options.config?.temperature === "number" ? options.config.temperature : 0.7;
+  const maxTokens = typeof options.config?.maxTokens === "number" ? options.config.maxTokens : 1024;
   
   try {
-    return await ai.models.generateContent({
+    const response = await ai.chat.completions.create({
       model: primaryModel,
-      contents: options.contents,
-      config: options.config,
+      messages: [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userMessage }
+      ],
+      temperature,
+      max_tokens: maxTokens,
+      ...(responseFormat ? { response_format: responseFormat } : {}),
     });
+    
+    return {
+      text: response.choices[0]?.message?.content || ""
+    };
   } catch (err: any) {
     const errMsg = (err?.message || "").toLowerCase();
     const isPermissionOrAccessError = 
       err?.status === 403 ||
       err?.status === 401 ||
-      (err?.statusCode && [401, 403].includes(err.statusCode)) ||
       errMsg.includes("permission_denied") || 
       errMsg.includes("denied access") || 
-      errMsg.includes("403") || 
-      errMsg.includes("forbidden") || 
-      errMsg.includes("not found") || 
-      errMsg.includes("not enabled");
-      
-    if (isPermissionOrAccessError) {
-      console.warn(`[Gemini API Warning] Model "${primaryModel}" failed with access restriction: ${err?.message || err}. Disabling Gemini Client permanently and utilizing pure high-fidelity local fallbacks.`);
-      ai = null;
-      throw new Error("GEMINI_API_RESTRICTED");
-    }
+      errMsg.includes("unauthorized");
+
+    console.warn(`[Groq Fallback] Primary model "${primaryModel}" failed: ${err?.message || err}. Attempting fallback models...`);
+    let sawAccessRestriction = isPermissionOrAccessError;
     
-    console.warn(`[Gemini Fallback] Primary model "${primaryModel}" failed: ${err?.message || err}. Attempting fallback models...`);
     for (const model of fallbackModels) {
       if (model !== primaryModel) {
         try {
-          console.log(`[Gemini Fallback] Attempting generation with fallback model: "${model}"...`);
-          return await ai.models.generateContent({
+          console.log(`[Groq Fallback] Attempting generation with fallback model: "${model}"...`);
+          const response = await ai.chat.completions.create({
             model: model,
-            contents: options.contents,
-            config: options.config,
+            messages: [
+              { role: "system", content: systemInstruction },
+              { role: "user", content: userMessage }
+            ],
+            temperature,
+            max_tokens: maxTokens,
+            ...(responseFormat ? { response_format: responseFormat } : {}),
           });
+          
+          return {
+            text: response.choices[0]?.message?.content || ""
+          };
         } catch (fallbackErr: any) {
           const fallbackErrMsg = (fallbackErr?.message || "").toLowerCase();
           const isFallbackPermissionOrAccessError = 
             fallbackErr?.status === 403 ||
             fallbackErr?.status === 401 ||
-            (fallbackErr?.statusCode && [401, 403].includes(fallbackErr.statusCode)) ||
             fallbackErrMsg.includes("permission_denied") || 
-            fallbackErrMsg.includes("denied access") || 
-            fallbackErrMsg.includes("403") || 
-            fallbackErrMsg.includes("forbidden") || 
-            fallbackErrMsg.includes("not found") || 
-            fallbackErrMsg.includes("not enabled");
-            
-          if (isFallbackPermissionOrAccessError) {
-            console.warn(`[Gemini API Warning] Fallback Model "${model}" failed with access restriction: ${fallbackErr?.message || fallbackErr}. Disabling Gemini Client permanently and utilizing pure high-fidelity local fallbacks.`);
-            ai = null;
-            throw new Error("GEMINI_API_RESTRICTED");
-          }
-          console.warn(`[Gemini Fallback] Model "${model}" failed too:`, fallbackErr?.message || fallbackErr);
+            fallbackErrMsg.includes("unauthorized");
+          sawAccessRestriction = sawAccessRestriction || isFallbackPermissionOrAccessError;
+          console.warn(`[Groq Fallback] Model "${model}" failed too:`, fallbackErr?.message || fallbackErr);
         }
       }
+    }
+    if (sawAccessRestriction) {
+      console.warn(`[Groq API Warning] Groq access failed for the requested model set. Disabling Groq Client permanently and utilizing pure high-fidelity local fallbacks.`);
+      ai = null;
+      throw new Error("GROQ_API_RESTRICTED");
     }
     throw err;
   }
@@ -194,43 +201,21 @@ app.post("/api/barcode/lookup", async (req, res) => {
     });
   }
 
-  // 2. Fallback to Gemini lookup if API client works
+  // 2. Fallback to Groq lookup if API client works
   if (ai) {
     try {
-      console.log(`Querying Gemini to identify product for barcode: ${barcode}`);
+      console.log(`Querying Groq to identify product for barcode: ${barcode}`);
       const prompt = `Identify the food product corresponding to this barcode UPC / EAN: "${barcode}". 
 Always provide estimated nutritions (Calories, Protein, Carb, Fat) for a standard serving size of this product.
-If you don't know the exact product, identify a typical popular product corresponding to standard barcode series or make an intelligent guess, but always return the valid JSON.`;
+If you don't know the exact product, identify a typical popular product corresponding to standard barcode series or make an intelligent guess.
+Respond with ONLY valid JSON in this exact format:
+{"items": [{"name": "product name", "amount": "serving size", "calories": number, "protein": number, "carbs": number, "fat": number}], "suggestion": "healthy tip", "estimatedUpcCode": "${barcode}"}`;
 
       const response = await generateContentWithFallback({
-        model: "gemini-3.5-flash",
+        model: "llama-3.3-70b-versatile",
         contents: prompt,
         config: {
-          systemInstruction: "You are an elite fitness nutritionist and structural data parser. Return food macros matching standard databases.",
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              items: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: "Detailed food product name." },
-                    amount: { type: Type.STRING, description: "Standard serving size/unit (e.g. 1 can, 100g, 1 bar)." },
-                    calories: { type: Type.NUMBER, description: "Calories per saving." },
-                    protein: { type: Type.NUMBER, description: "Protein grams." },
-                    carbs: { type: Type.NUMBER, description: "Carbohydrates grams." },
-                    fat: { type: Type.NUMBER, description: "Fat grams." }
-                  },
-                  required: ["name", "amount", "calories", "protein", "carbs", "fat"]
-                }
-              },
-              suggestion: { type: Type.STRING, description: "Brief healthy suggestion on how a fitness enthusiast should fit this food into their habits/macros." },
-              estimatedUpcCode: { type: Type.STRING }
-            },
-            required: ["items", "suggestion"]
-          }
+          systemInstruction: "You are an elite fitness nutritionist and structural data parser. Return food macros matching standard databases. Respond with ONLY valid JSON, no markdown, no code blocks.",
         }
       });
 
@@ -239,14 +224,14 @@ If you don't know the exact product, identify a typical popular product correspo
         return res.json({
           isSuccess: true,
           data: parsed,
-          source: "gemini-api"
+          source: "groq-api"
         });
       }
     } catch (err: any) {
-      if (err?.message === "GEMINI_API_RESTRICTED") {
-        console.warn("Gemini service is restricted. Standard local barcode backup activated.");
+      if (err?.message === "GROQ_API_RESTRICTED") {
+        console.warn("Groq service is restricted. Standard local barcode backup activated.");
       } else {
-        console.warn("Gemini barcode lookup failed, using simulated barcode generation:", err?.message || err);
+        console.warn("Groq barcode lookup failed, using simulated barcode generation:", err?.message || err);
       }
     }
   }
@@ -264,7 +249,7 @@ If you don't know the exact product, identify a typical popular product correspo
         carbs: 15,
         fat: 4.5,
       }],
-      suggestion: "Set up your GEMINI_API_KEY in the Secrets panel to activate live AI scanning for arbitrary unrecognized barcodes with vision models!",
+      suggestion: "Set up your GROQ_API_KEY in the Secrets panel to activate live AI scanning for arbitrary unrecognized barcodes with vision models!",
       estimatedUpcCode: barcode,
     },
     source: "simulation-agent"
@@ -279,10 +264,10 @@ app.post("/api/diet/analyze", async (req, res) => {
     return res.status(400).json({ error: "Either natural food description text or an image is required" });
   }
 
-  // 1. If AI client is active, call real Gemini API
+  // 1. If AI client is active, call real Groq API
   if (ai) {
     try {
-      console.log("Analyzing diet using Gemini 3.5 Flash...");
+      console.log("Analyzing diet using Groq AI...");
       let contents: any;
 
       if (image) {
@@ -302,54 +287,32 @@ app.post("/api/diet/analyze", async (req, res) => {
         contents = `Extract macro nutrients, calorie counts, and standard portions for this query: "${text}". Split compound descriptions into separate items if applicable. Give positive nutrition adjustments in the suggestion feedback.`;
       }
 
+      const jsonPrompt = typeof contents === "string" ? contents : `${contents.text || JSON.stringify(contents)}
+
+Respond with ONLY valid JSON: {"items": [{"name": "food name", "amount": "portion", "calories": number, "protein": number, "carbs": number, "fat": number}], "suggestion": "nutrition tip"}`;
+      
       const response = await generateContentWithFallback({
-        model: "gemini-3.5-flash",
-        contents,
+        model: "llama-3.3-70b-versatile",
+        contents: jsonPrompt,
         config: {
-          systemInstruction: "You are Serene Fitness Nutrition Coach. Analyze natural text logs or food photos, extract calories and macros (P, C, F), and deliver direct, actionable habit recommendations.",
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              items: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: "Specific name of the identified food substance." },
-                    amount: { type: Type.STRING, description: "Inferred portion amount or weight (e.g. 150g, 2 medium pieces, 1 cup)." },
-                    calories: { type: Type.NUMBER, description: "Estimated kcal" },
-                    protein: { type: Type.NUMBER, description: "Protein content in grams" },
-                    carbs: { type: Type.NUMBER, description: "Carbohydrates in grams" },
-                    fat: { type: Type.NUMBER, description: "Fat in grams" }
-                  },
-                  required: ["name", "amount", "calories", "protein", "carbs", "fat"]
-                }
-              },
-              suggestion: {
-                type: Type.STRING,
-                description: "Positive fitness habit suggestion, optimal pairing, or micronutrient advice (e.g., add fiber, slow-release fats, high protein pacing)."
-              }
-            },
-            required: ["items", "suggestion"]
-          }
+          systemInstruction: "You are Serene Fitness Nutrition Coach. Analyze natural text logs or food photos, extract calories and macros (P, C, F), and deliver direct, actionable habit recommendations. Respond with ONLY valid JSON, no markdown or code blocks.",
         }
       });
 
       if (response && response.text) {
-        console.log("Response successfully generated from Gemini.");
+        console.log("Response successfully generated from Groq.");
         const parsed = JSON.parse(response.text.trim());
         return res.json({
           isSuccess: true,
           data: parsed,
-          source: "gemini-api"
+          source: "groq-api"
         });
       }
     } catch (err: any) {
-      if (err?.message === "GEMINI_API_RESTRICTED") {
-        console.warn("Gemini service is restricted. Standard local food backup activated.");
+      if (err?.message === "GROQ_API_RESTRICTED") {
+        console.warn("Groq service is restricted. Standard local food backup activated.");
       } else {
-        console.warn("Gemini meal analysis failed, using local simulation:", err?.message || err);
+        console.warn("Groq meal analysis failed, using local simulation:", err?.message || err);
       }
     }
   }
@@ -365,7 +328,7 @@ app.post("/api/diet/analyze", async (req, res) => {
   let protein = 25;
   let carbs = 30;
   let fat = 10;
-  let suggestion = "Configure your GEMINI_API_KEY in Settings > Secrets to activate live vision scanning and conversational parsing! Here is a healthy macro estimation fallback.";
+  let suggestion = "Configure your GROQ_API_KEY in Settings > Secrets to activate live vision scanning and conversational parsing! Here is a healthy macro estimation fallback.";
 
   if (image) {
     name = "Visually Identified Meal";
@@ -374,7 +337,7 @@ app.post("/api/diet/analyze", async (req, res) => {
     protein = 28;
     carbs = 45;
     fat = 12;
-    suggestion = "Visual capture analyzed (Simulation): Found general workout replenishment plate containing high protein source and complex starches. Connect your Gemini API Key in AI Studio sidebar details for live visual food analysis.";
+    suggestion = "Visual capture analyzed (Simulation): Found general workout replenishment plate containing high protein source and complex starches. Connect your Groq API Key in AI Studio sidebar details for live visual food analysis.";
   } else if (query.includes("egg") || query.includes("omelet")) {
     name = "Whole Eggs & Whites";
     amount = "3 large eggs";
@@ -450,26 +413,39 @@ app.post("/api/diet/suggestions", async (req, res) => {
 
 Please write a brief summary of how well they are hitting their targets (Protein, Carbs, Fats) and supply exactly 3 bullet points with elite professional coaching suggestions to refine their habit diet plan, pacing, or lifestyle. Keep it concise, high-impact, completely literal and professional. No fluff.`;
 
+      const jsonPrompt = `${prompt}
+
+Respond with ONLY a JSON object with keys "summary" and "suggestions" where suggestions is an array of 3 bullet points.`;
+      
       const response = await generateContentWithFallback({
-        model: "gemini-3.5-flash",
-        contents: prompt,
+        model: "llama-3.3-70b-versatile",
+        contents: jsonPrompt,
         config: {
-          systemInstruction: "You are Serene Fitness Nutrition Coach. Provide exact, helpful, brief action items for muscle maintenance, insulin control, and active replenishment.",
+          systemInstruction: "You are Serene Fitness Nutrition Coach. Provide exact, helpful, brief action items for muscle maintenance, insulin control, and active replenishment. Respond with ONLY valid JSON, no markdown or code blocks.",
         }
       });
 
       if (response && response.text) {
-        return res.json({
-          isSuccess: true,
-          suggestion: response.text.trim(),
-          source: "gemini-api"
-        });
+        try {
+          const parsed = JSON.parse(response.text.trim());
+          return res.json({
+            isSuccess: true,
+            suggestion: typeof parsed.summary === "string" ? parsed.summary : response.text.trim(),
+            source: "groq-api"
+          });
+        } catch {
+          return res.json({
+            isSuccess: true,
+            suggestion: response.text.trim(),
+            source: "groq-api"
+          });
+        }
       }
     } catch (err: any) {
-      if (err?.message === "GEMINI_API_RESTRICTED") {
-        console.warn("Gemini service is restricted. Standard local diet habits backup activated.");
+      if (err?.message === "GROQ_API_RESTRICTED") {
+        console.warn("Groq service is restricted. Standard local diet habits backup activated.");
       } else {
-        console.warn("Gemini daily suggestion failed, using fallback:", err?.message || err);
+        console.warn("Groq daily suggestion failed, using fallback:", err?.message || err);
       }
     }
   }
@@ -492,7 +468,7 @@ Please write a brief summary of how well they are hitting their targets (Protein
 2. **Support Active Repair**: Since you burned about ${caloriesBurned || 120} calories from active activity, support recovery with slow-digesting proteins, complex minerals and magnesium before bed.
 3. **${bodyComp?.goal || "Diet Core Adjustment"} Specific recommendation**: ${goalSuggestion}
 
-Configure your GEMINI_API_KEY to activate dynamic contextual coaching generated uniquely from real-time nutritional patterns daily!`,
+Configure your GROQ_API_KEY to activate dynamic contextual coaching generated uniquely from real-time nutritional patterns daily!`,
     source: "simulation-agent"
   });
 });
@@ -806,48 +782,25 @@ app.post("/api/recipes/search", async (req, res) => {
 
   const queryLower = query.toLowerCase();
 
-  // 1. Live Gemini AI Recipe Generator & Search Grounder if available
+  // 1. Live Groq AI Recipe Generator & Search Grounder if available
   if (ai) {
     try {
-      console.log(`Searching recipes on Gemini with query: "${query}"...`);
+      console.log(`Searching recipes on Groq with query: "${query}"...`);
       const prompt = `Search and discover recipes matching this query: "${queryLower}". 
 Make sure you deliver exactly 3 to 4 distinct high-fidelity fitness recipe proposals. 
 Assign real-world macronutrient and calorie balances (such as high-protein meat being protein-saturated, carbs in grains, fats in oils).
 Include detailed measurements inside the ingredients array. Deliver structured, clear step-by-step cooking instructions (3-5 steps).`;
 
+      const jsonPrompt = `${prompt}
+
+Respond with ONLY valid JSON with "recipes" key containing an array of recipe objects with: name, description, amount, calories, protein, carbs, fat, prepTime, difficulty, ingredients (array), instructions (array), tags (array).`;
+      
       const response = await generateContentWithFallback({
-        model: "gemini-3.5-flash",
-        contents: prompt,
+        model: "llama-3.3-70b-versatile",
+        contents: jsonPrompt,
         config: {
-          systemInstruction: "You are Serene Fitness Head Chef and Executive Nutritionist. Provide pristine recipe outcomes that align strictly with the responseSchema.",
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              recipes: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: "Elegant, beautiful name of direct culinary creation." },
-                    description: { type: Type.STRING, description: "A highly appetizing, mouthwatering summary." },
-                    amount: { type: Type.STRING, description: "Servings generated (e.g. '1 Bowl', 'Yields 2 portions')." },
-                    calories: { type: Type.NUMBER, description: "Total kcals per serving portion." },
-                    protein: { type: Type.NUMBER, description: "Total protein grams." },
-                    carbs: { type: Type.NUMBER, description: "Total carbohydrates grams." },
-                    fat: { type: Type.NUMBER, description: "Total fats grams." },
-                    prepTime: { type: Type.STRING, description: "Approximate time to prepare and cook." },
-                    difficulty: { type: Type.STRING, description: "Difficulty level such as Easy, Medium, or Hard." },
-                    ingredients: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exact components with metric/standard measurements." },
-                    instructions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Clear ordered cooking steps." },
-                    tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Allergic or diet tags such as Keto, Vegan, Gluten-Free, High Protein." }
-                  },
-                  required: ["name", "description", "amount", "calories", "protein", "carbs", "fat", "prepTime", "difficulty", "ingredients", "instructions", "tags"]
-                }
-              }
-            },
-            required: ["recipes"]
-          }
+          systemInstruction: "You are Serene Fitness Head Chef and Executive Nutritionist. Provide pristine recipe outcomes as valid JSON. Respond with ONLY valid JSON, no markdown or code blocks.",
+          responseFormat: { type: "json_object" },
         }
       });
 
@@ -856,14 +809,14 @@ Include detailed measurements inside the ingredients array. Deliver structured, 
         return res.json({
           isSuccess: true,
           recipes: parsed.recipes,
-          source: "gemini-api"
+          source: "groq-api"
         });
       }
     } catch (err: any) {
-      if (err?.message === "GEMINI_API_RESTRICTED") {
-        console.warn("Gemini service is restricted. Pure local keyword recipe index activated.");
+      if (err?.message === "GROQ_API_RESTRICTED") {
+        console.warn("Groq service is restricted. Pure local keyword recipe index activated.");
       } else {
-        console.warn("Gemini recipe search failed, utilizing keyword fallback:", err?.message || err);
+        console.warn("Groq recipe search failed, utilizing keyword fallback:", err?.message || err);
       }
     }
   }
@@ -874,9 +827,9 @@ Include detailed measurements inside the ingredients array. Deliver structured, 
     const textSearch = (r.name + " " + r.description + " " + r.tags.join(" ")).toLowerCase();
     
     // Split query and check if any words trigger a match
-    const keywords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    const keywords = queryLower.split(/\s+/).filter((w: string) => w.length > 2);
     if (keywords.length === 0) return true; // Default match all if empty
-    return keywords.some(kw => textSearch.includes(kw));
+    return keywords.some((kw: string) => textSearch.includes(kw));
   });
 
   // If search produces no direct results, return all or default set
@@ -899,10 +852,10 @@ app.post("/api/recipes/calculate", async (req, res) => {
     return res.status(400).json({ error: "Ingredients text list is required to compute nutrition values" });
   }
 
-  // 1. Call Gemini to calculate macros
+  // 1. Call Groq to calculate macros
   if (ai) {
     try {
-      console.log(`Calculating nutrition on Gemini for custom recipe: "${name}"...`);
+      console.log(`Calculating nutrition on Groq for custom recipe: "${name}"...`);
       const prompt = `Decompose are parse the individual ingredients listed below and calculate the entire caloric weight and macro counts (Protein, Carbs, Fats) for this custom recipe.
 Title specified: "${name || "My Custom Formulation"}"
 Ingredients Input:
@@ -913,40 +866,16 @@ ${prepInstructions || "None given."}
 
 Respond back with the recipe title, sum summaries of calories, proteins, carbohydrates, fats, and provide a clear detailed list of each ingredient decomposed to display their contribution in the breakdown array. Add high-performance sports nutrition feedback in the nutritionTip feedback.`;
 
+      const jsonPrompt = `${prompt}
+
+Respond with ONLY valid JSON: {"recipeName": "name", "calories": number, "protein": number, "carbs": number, "fat": number, "ingredientsBreakdown": [{"raw": "input line", "name": "ingredient", "amount": "portion", "calories": number, "protein": number, "carbs": number, "fat": number}], "nutritionTip": "suggestion"}`;
+      
       const response = await generateContentWithFallback({
-        model: "gemini-3.5-flash",
-        contents: prompt,
+        model: "llama-3.3-70b-versatile",
+        contents: jsonPrompt,
         config: {
-          systemInstruction: "You are Serene Fitness Nutrition Coach and Molecular Food Analyst. Parse custom ingredients text, evaluate caloric value lines, and provide premium dietary optimizations.",
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              recipeName: { type: Type.STRING },
-              calories: { type: Type.NUMBER },
-              protein: { type: Type.NUMBER },
-              carbs: { type: Type.NUMBER },
-              fat: { type: Type.NUMBER },
-              ingredientsBreakdown: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    raw: { type: Type.STRING, description: "Raw line from user's input representing this ingredient." },
-                    name: { type: Type.STRING, description: "Identified clear name of the ingredient (e.g. skinless breast, coconut oil)." },
-                    amount: { type: Type.STRING, description: "Portion or mass detected (e.g. 200g, 1 piece)." },
-                    calories: { type: Type.NUMBER },
-                    protein: { type: Type.NUMBER },
-                    carbs: { type: Type.NUMBER },
-                    fat: { type: Type.NUMBER }
-                  },
-                  required: ["raw", "name", "amount", "calories", "protein", "carbs", "fat"]
-                }
-              },
-              nutritionTip: { type: Type.STRING, description: "Coaching recommendation to tweak or enhance this custom compile (e.g. oil replacement, yogurt substitution)." }
-            },
-            required: ["recipeName", "calories", "protein", "carbs", "fat", "ingredientsBreakdown", "nutritionTip"]
-          }
+          systemInstruction: "You are Serene Fitness Nutrition Coach and Molecular Food Analyst. Parse custom ingredients text, evaluate caloric value lines, and provide premium dietary optimizations. Respond with ONLY valid JSON, no markdown or code blocks.",
+          responseFormat: { type: "json_object" },
         }
       });
 
@@ -955,14 +884,14 @@ Respond back with the recipe title, sum summaries of calories, proteins, carbohy
         return res.json({
           isSuccess: true,
           data: parsed,
-          source: "gemini-api"
+          source: "groq-api"
         });
       }
     } catch (err: any) {
-      if (err?.message === "GEMINI_API_RESTRICTED") {
-        console.warn("Gemini service is restricted. Intelligent heuristics formula calculator activated.");
+      if (err?.message === "GROQ_API_RESTRICTED") {
+        console.warn("Groq service is restricted. Intelligent heuristics formula calculator activated.");
       } else {
-        console.warn("Gemini custom recipe calculation failed, utilizing heuristics parser:", err?.message || err);
+        console.warn("Groq custom recipe calculation failed, utilizing heuristics parser:", err?.message || err);
       }
     }
   }
@@ -998,4 +927,8 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+
+if (process.env.VERCEL !== "1") {
+  startServer();
+}

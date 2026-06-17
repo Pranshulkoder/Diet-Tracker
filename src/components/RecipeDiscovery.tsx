@@ -50,7 +50,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
       const data = await response.json();
       if (data.isSuccess && data.recipes) {
         setRecipes(data.recipes);
-        setSearchFeedback(`Retrieved ${data.recipes.length} optimal formula proposals (via ${data.source === "gemini-api" ? "Gemini Elite Chef AI" : "Local Smart Index"}).`);
+        setSearchFeedback(`Retrieved ${data.recipes.length} optimal formula proposals (via ${data.source === "groq-api" ? "Groq Elite Chef AI" : "Local Smart Index"}).`);
         setExpandedRecipeIdx(0); // Open first by default
       } else {
         setSearchFeedback("Failed to pull matching recipe lists. Please retry.");
@@ -81,7 +81,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
       const resData = await response.json();
       if (resData.isSuccess && resData.data) {
         setCalcResult(resData.data);
-        setCalcFeedback(`Analysis locking completed successfully using ${resData.source === "gemini-api" ? "Gemini Molecular AI" : "Heuristic Parser"}.`);
+        setCalcFeedback(`Analysis locking completed successfully using ${resData.source === "groq-api" ? "Groq Molecular AI" : "Heuristic Parser"}.`);
       } else {
         setCalcFeedback("Calculation halted unexpectedly. Verify ingredient lines.");
       }
@@ -123,7 +123,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
   };
 
   return (
-    <div className="bg-vibrant-card rounded-[2rem] p-6 border border-vibrant-border shadow-md space-y-6">
+    <div className="bg-vibrant-card rounded-4xl p-6 border border-vibrant-border shadow-md space-y-6">
       
       {/* Visual Header */}
       <div className="flex items-center gap-3 border-b border-vibrant-border pb-5">
@@ -131,15 +131,29 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
           <ChefHat id="recipe-hub-icon" className="w-6 h-6 animate-pulse" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          {/* <h2 className="text-xl font-bold text-white flex items-center gap-2">
             AI Culinary Recipe Hub <span className="text-[9px] bg-vibrant-lime/20 text-vibrant-lime font-mono font-black border border-vibrant-lime/30 px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
-          </h2>
+          </h2> */}
+          <h2 className="text-xl font-bold text-zinc-700 flex items-center gap-2 flex-wrap">
+              AI Culinary Recipe Hub
+
+              <span className="text-[9px] bg-vibrant-lime/20 text-vibrant-lime font-mono font-black border border-vibrant-lime/30 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                Active
+              </span>
+
+              <span className="text-[14px] font-sans font-black px-3 py-0.5 rounded-full uppercase tracking-widest
+                bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500
+                text-white border border-orange-300/50
+                animate-pulse">
+                🚧 Under Development
+              </span>
+            </h2>
           <p className="text-xs text-zinc-500">Discover macronutrient-precise culinary recipes or compute custom ingredients on-the-fly.</p>
         </div>
       </div>
 
       {/* Internal Navigation Subtabs */}
-      <div className="grid grid-cols-2 gap-2 bg-[#0A0A0B] p-1.5 rounded-2xl border border-vibrant-border">
+      <div className="grid grid-cols-2 gap-2 bg-vibrant-bg p-1.5 rounded-2xl border border-vibrant-border">
         <button
           onClick={() => setActiveSubTab("search")}
           className={`py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
@@ -192,7 +206,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
 
           {/* Search bar input action */}
           <div className="flex gap-2.5">
-            <div className="relative flex-grow">
+            <div className="relative grow">
               <Search className="absolute left-4 top-3.5 text-zinc-500 w-4 h-4" />
               <input
                 id="recipe-search-input"
@@ -443,7 +457,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
                   onChange={(e) => setCalcPrep(e.target.value)}
                   rows={3}
                   placeholder="e.g. blend ingredient set thoroughly and bake on pan for 5 minutes..."
-                  className="w-full px-4 py-3 bg-zinc-900 border border-vibrant-border rounded-xl text-xs text-white placeholder-zinc-500 focus:ring-2 focus:ring-vibrant-cyan/15 focus:border-vibrant-cyan outline-none resize-none leading-relaxed font-semibold text-xs"
+                  className="w-full px-4 py-3 bg-zinc-900 border border-vibrant-border rounded-xl text-xs text-white placeholder-zinc-500 focus:ring-2 focus:ring-vibrant-cyan/15 focus:border-vibrant-cyan outline-none resize-none leading-relaxed font-semibold"
                 />
               </div>
 
@@ -521,7 +535,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
                         <tbody className="divide-y divide-zinc-900 font-mono text-[10px]">
                           {calcResult.ingredientsBreakdown.map((item, key) => (
                             <tr key={key} className="hover:bg-zinc-900/40">
-                              <td className="py-2.5 font-sans font-medium text-white max-w-[140px] truncate leading-tight">
+                              <td className="py-2.5 font-sans font-medium text-white max-w-35 truncate leading-tight">
                                 <span className="text-zinc-400 mr-1.5 font-bold">↳</span> {item.raw}
                               </td>
                               <td className="py-2.5 px-1 text-right text-white font-bold">{item.calories}</td>
@@ -574,7 +588,7 @@ export default function RecipeDiscovery({ onAddFood }: RecipeDiscoveryProps) {
 
                 </div>
               ) : (
-                <div className="h-full min-h-[280px] border border-dashed border-vibrant-border/80 rounded-2xl flex flex-col items-center justify-center p-6 text-center text-zinc-500 gap-2.5">
+                <div className="h-full min-h-70 border border-dashed border-vibrant-border/80 rounded-2xl flex flex-col items-center justify-center p-6 text-center text-zinc-500 gap-2.5">
                   <Sparkles className="w-8 h-8 text-zinc-700 hover:text-vibrant-cyan transition-colors hover:animate-pulse" />
                   <p className="text-xs font-bold font-mono uppercase">Calculator Pending Input</p>
                   <p className="text-[10px] max-w-xs text-zinc-500 leading-normal">

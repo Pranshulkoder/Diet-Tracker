@@ -91,7 +91,7 @@ export default function MacroDashboard({ macroGoals, loggedFoods, activeCalories
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Calorie Progress Wheel Box */}
-        <div className="bg-vibrant-card rounded-[2rem] p-6 border border-vibrant-border shadow-md flex flex-col items-center justify-center text-center">
+        <div className="bg-vibrant-card rounded-4xl p-6 border border-vibrant-border shadow-md flex flex-col items-center justify-center text-center">
           <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-4">Thermodynamic Calorie Balance</span>
           
           <div className="relative w-44 h-44 flex items-center justify-center">
@@ -147,7 +147,7 @@ export default function MacroDashboard({ macroGoals, loggedFoods, activeCalories
         </div>
 
         {/* Macros split bar trackers */}
-        <div className="bg-vibrant-card rounded-[2rem] p-6 border border-vibrant-border shadow-md flex flex-col justify-between">
+        <div className="bg-vibrant-card rounded-4xl p-6 border border-vibrant-border shadow-md flex flex-col justify-between">
           <div>
             <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-5 leading-none">Macro Nutrient Allocations</span>
             
@@ -210,7 +210,7 @@ export default function MacroDashboard({ macroGoals, loggedFoods, activeCalories
         </div>
 
         {/* Daily Steps Level Box */}
-        <div className="bg-vibrant-card rounded-[2rem] p-6 border border-vibrant-border shadow-md flex flex-col justify-between">
+        <div className="bg-vibrant-card rounded-4xl p-6 border border-vibrant-border shadow-md flex flex-col justify-between">
           <div className="space-y-3">
             <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest block leading-none">Pedometer & Steps tracking</span>
             
@@ -245,7 +245,7 @@ export default function MacroDashboard({ macroGoals, loggedFoods, activeCalories
       </div>
 
       {/* AI coach Daily suggestions review */}
-      <div className="bg-vibrant-card rounded-[2rem] p-6 border border-vibrant-border shadow-md space-y-4">
+      <div className="bg-vibrant-card rounded-4xl p-6 border border-vibrant-border shadow-md space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2.5 bg-vibrant-lime/10 text-vibrant-lime rounded-xl">

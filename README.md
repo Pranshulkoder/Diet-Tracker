@@ -6,7 +6,7 @@ Habit and diet tracker built with React, Vite, Express, and TypeScript.
 
 - Node.js 18 or later
 - npm
-- A Gemini API key if you want the AI features to use live Gemini responses
+- A groq API key if you want the AI features to use live responses
 
 ## Local Setup
 
@@ -19,7 +19,7 @@ Habit and diet tracker built with React, Vite, Express, and TypeScript.
 2. Create a local environment file:
 
    - Copy [.env.example](./.env.example) to [.env.local](./.env.local)
-   - Set `GEMINI_API_KEY` to your Gemini API key
+   - Set `Groq_API_KEY` to your Grok API key
 
 3. Start the development server:
 
@@ -29,7 +29,7 @@ Habit and diet tracker built with React, Vite, Express, and TypeScript.
 
 4. Open the app in your browser at `http://localhost:3000`
 
-If you do not provide `GEMINI_API_KEY`, the app still runs and uses local fallback behavior for AI-powered features.
+If you do not provide `GROK_API_KEY`, the app still runs and uses local fallback behavior for AI-powered features.
 
 ## Production Build
 
@@ -58,6 +58,8 @@ npm start
 ## Deployment Notes
 
 - The server reads `PORT` from the environment and falls back to `3000` locally.
-- Set `GEMINI_API_KEY` in your deployment platform’s secret or environment settings.
+- Set `Groq_API_KEY` in your deployment platform’s secret or environment settings.
 - `APP_URL` is listed in [.env.example](./.env.example) for future use, but it is not currently required by the app.
+
+
 working link of project : 'https://diettracker-tau.vercel.app/'

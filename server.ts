@@ -409,9 +409,16 @@ app.post("/api/diet/suggestions", async (req, res) => {
 - Fitness Target: ${bodyComp?.goal || "Fat Loss"}
 - Daily Calories Goal: ${dailyTarget?.calories || "2000"} kcal
 - Total Active Calories Burned Today: ${caloriesBurned || "350"} kcal
-- Logget Food Items: ${JSON.stringify(loggedItems || [])}
+- Logged Food Items: ${JSON.stringify(loggedItems || [])}
 
-Please write a brief summary of how well they are hitting their targets (Protein, Carbs, Fats) and supply exactly 3 bullet points with elite professional coaching suggestions to refine their habit diet plan, pacing, or lifestyle. Keep it concise, high-impact, completely literal and professional. No fluff.`;
+Do not simply repeat the values shown. Instead, interpret what the numbers mean in context and identify meaningful patterns, strengths, gaps, and potential limiting factors.
+Evaluate:
+Protein intake relative to muscle retention/growth needs.
+Carbohydrate intake relative to training performance, recovery, and goal.
+Fat intake relative to hormonal health and energy balance.
+Calorie intake relative to body composition goals.
+Body composition trends (weight, body fat %, lean mass, muscle mass, visceral fat, metabolic indicators, if available).
+Overall alignment between current habits and the stated fitness objective.`;
 
       const jsonPrompt = `${prompt}
 

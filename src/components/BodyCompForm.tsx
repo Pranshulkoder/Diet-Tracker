@@ -129,7 +129,7 @@ export default function BodyCompForm({ initialProfile, onProfileChange }: BodyCo
   };
 
   return (
-    <div className="bg-vibrant-card rounded-[2rem] p-6 md:p-8 border border-vibrant-border shadow-md transition-all duration-300">
+    <div className="bg-vibrant-card rounded-4xl p-6 md:p-8 border border-vibrant-border shadow-md transition-all duration-300">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-3 bg-vibrant-cyan/10 text-vibrant-cyan rounded-2xl">
           <Scale id="body-composition-icon" className="w-6 h-6" />

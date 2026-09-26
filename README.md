@@ -62,4 +62,4 @@ npm start
 - `APP_URL` is listed in [.env.example](./.env.example) for future use, but it is not currently required by the app.
 
 
-working link of project : 'https://diettracker-tau.vercel.app/'
+working link of project : 'https://diet-tracker-lime-xi.vercel.app/'
